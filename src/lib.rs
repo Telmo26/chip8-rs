@@ -93,6 +93,8 @@ impl Chip8 {
     fn execute_opcode(&mut self, opcode: u16) {
         let nibbles = Self::divide_opcode(&opcode);
         
+        // println!("Opcode = {opcode}, nibbles = {nibbles:?}");
+
         match nibbles[0] {
             0x0 => match nibbles[3] {
                 // Clear display
@@ -104,7 +106,7 @@ impl Chip8 {
                                                             // being in a subroutine, which indicates
                                                             // a bigger issue, and should crash.
 
-                _ => panic!("Opcode {opcode:#X} not recognised!"),
+                _ => (), // This is 'loading machine code' that we have to ignore
             },
 
             // Jump
@@ -149,50 +151,35 @@ impl Chip8 {
                 0x4 => {
                     let overflow: bool;
                     (self.v[nibbles[1]], overflow) = self.v[nibbles[1]].overflowing_add(self.v[nibbles[2]]);
-                    if overflow {
-                        self.v[0xF] = 1;
-                    } else {
-                        self.v[0xF] = 0;
-                    }
+                    self.v[0xF] = if overflow { 1 } else { 0 };
                 },
 
                 // VX = VX - VY with carry
                 0x5 => {
                     let underflow: bool;
                     (self.v[nibbles[1]], underflow) = self.v[nibbles[1]].overflowing_sub(self.v[nibbles[2]]);
-                    if underflow {
-                        self.v[0xF] = 0;
-                    } else {
-                        self.v[0xF] = 1;
-                    }
+                    self.v[0xF] = if underflow { 0 } else { 1 };
                 },
 
                 // VX = VY, VX >> 1, VF = bit shifted
                 0x6 => {
-                    self.v[nibbles[1]] = self.v[nibbles[2]] >> 1;
-                    self.v[0xF] = self.v[nibbles[2]] % 2;
+                    let bottom_bit = self.v[nibbles[2]] % 2;
+                    self.v[nibbles[1]] =  self.v[nibbles[2]] >> 1;
+                    self.v[0xF] = bottom_bit;
                 },
 
                 // VX = VY - VX with carry
                 0x7 => {
                     let underflow: bool;
                     (self.v[nibbles[1]], underflow) = self.v[nibbles[2]].overflowing_sub(self.v[nibbles[1]]);
-                    if underflow {
-                        self.v[0xF] = 0;
-                    } else {
-                        self.v[0xF] = 1;
-                    }
+                    self.v[0xF] = if underflow { 0 } else { 1 };
                 },
 
                 // VX = VY, VX << 1, VF = bit shifted
                 0xE => {
+                    let top_bit = self.v[nibbles[2]] / (1_u8 << 7);
                     self.v[nibbles[1]] = self.v[nibbles[2]] << 1;
-                    if self.v[nibbles[1]]/2 == self.v[nibbles[2]] { // We use division by two to not overflow
-                        // We shifted away a zero
-                        self.v[0xF] = 0;
-                    } else {
-                        self.v[0xF] = 1;
-                    }
+                    self.v[0xF] = top_bit;
                 },
                 _ => panic!("Opcode {opcode:#X} not recognised!"),
             }
@@ -215,15 +202,35 @@ impl Chip8 {
             // Draw call
             0xD => self.draw(nibbles[1], nibbles[2], nibbles[3]),
 
-            0xE => (),
+            // Non-blocking key operations
+            0xE => match nibbles[2] {
+                // Skips next iteration if VX key is pressed
+                0x9 => (),
+
+                // Skips next iteration if VX key is not pressed
+                0xA => (),
+                
+                _ => panic!("Opcode {opcode:#X} not recognised!")
+            },
 
             0xF => match reconstruct_byte(&nibbles[2..]) {
-                0x07 => (),
+                // VX = delay
+                0x07 => self.v[nibbles[1]] = self.delay_timer,
+
+                // VX = key pressed (blocking)
                 0x0A => (),
-                0x15 => (),
-                0x18 => (),
+
+                // Set delay timer to VX
+                0x15 => self.delay_timer = self.v[nibbles[1]],
+
+                // Set sound time to VX
+                0x18 => self.sound_timer = self.v[nibbles[1]],
+
+                // Register I increment
                 0x1E => self.i = self.i.wrapping_add((self.v[nibbles[1]]) as u16),
-                0x29 => (),
+
+                // Font character
+                0x29 => self.i = 0x050 + (self.v[nibbles[1]] * 5) as u16,
 
                 // Binary-coded decimal conversion
                 0x33 => {
@@ -247,6 +254,7 @@ impl Chip8 {
                         self.v[i] = self.memory[self.i as usize + i];
                     }
                 },
+
                 _ => panic!("Opcode {opcode:#X} not recognised!")
             }
 
