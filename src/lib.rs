@@ -20,7 +20,7 @@ pub struct Chip8 {
     delay_timer: u8,
     sound_timer: u8,
     v: [u8; 16],
-    display: Display,
+    pub display: Display,
 }
 
 impl Chip8 {
@@ -93,7 +93,7 @@ impl Chip8 {
     fn execute_opcode(&mut self, opcode: u16) {
         let nibbles = Self::divide_opcode(&opcode);
         
-        // println!("Opcode = {opcode}, nibbles = {nibbles:?}");
+        // println!("Opcode = {opcode:X}, nibbles = {nibbles:?}");
 
         match nibbles[0] {
             0x0 => match nibbles[3] {
@@ -106,7 +106,7 @@ impl Chip8 {
                                                             // being in a subroutine, which indicates
                                                             // a bigger issue, and should crash.
 
-                _ => (), // This is 'loading machine code' that we have to ignore
+                _ => panic!(), // This is 'loading machine code' that we have to ignore
             },
 
             // Jump
@@ -163,8 +163,8 @@ impl Chip8 {
 
                 // VX = VY, VX >> 1, VF = bit shifted
                 0x6 => {
-                    let bottom_bit = self.v[nibbles[2]] % 2;
-                    self.v[nibbles[1]] =  self.v[nibbles[2]] >> 1;
+                    let bottom_bit = self.v[nibbles[1]] % 2;
+                    self.v[nibbles[1]] =  self.v[nibbles[1]] >> 1;
                     self.v[0xF] = bottom_bit;
                 },
 
@@ -177,8 +177,8 @@ impl Chip8 {
 
                 // VX = VY, VX << 1, VF = bit shifted
                 0xE => {
-                    let top_bit = self.v[nibbles[2]] / (1_u8 << 7);
-                    self.v[nibbles[1]] = self.v[nibbles[2]] << 1;
+                    let top_bit = self.v[nibbles[1]] / (1_u8 << 7);
+                    self.v[nibbles[1]] = self.v[nibbles[1]] << 1;
                     self.v[0xF] = top_bit;
                 },
                 _ => panic!("Opcode {opcode:#X} not recognised!"),
@@ -203,14 +203,16 @@ impl Chip8 {
             0xD => self.draw(nibbles[1], nibbles[2], nibbles[3]),
 
             // Non-blocking key operations
-            0xE => match nibbles[2] {
-                // Skips next iteration if VX key is pressed
-                0x9 => (),
+            0xE => {
+                match nibbles[2] {
+                    // Skips next iteration if VX key is pressed
+                    0x9 => if self.display.check_key(self.v[nibbles[1]]) { self.pc += 2 },
 
-                // Skips next iteration if VX key is not pressed
-                0xA => (),
-                
-                _ => panic!("Opcode {opcode:#X} not recognised!")
+                    // Skips next iteration if VX key is not pressed
+                    0xA => if !self.display.check_key(self.v[nibbles[1]]) { self.pc += 2 },
+                    
+                    _ => panic!("Opcode {opcode:#X} not recognised!")
+                }
             },
 
             0xF => match reconstruct_byte(&nibbles[2..]) {
@@ -218,7 +220,17 @@ impl Chip8 {
                 0x07 => self.v[nibbles[1]] = self.delay_timer,
 
                 // VX = key pressed (blocking)
-                0x0A => (),
+                0x0A => {
+                    println!("Checking for keys");
+                    let vx = &mut self.v[nibbles[1]];
+                    match self.display.get_key() {
+                        Ok(code) => {
+                            *vx = code;
+                            println!("Key pressed : {code}");
+                        },
+                        Err(_) => self.pc -= 2,
+                    }
+                },
 
                 // Set delay timer to VX
                 0x15 => self.delay_timer = self.v[nibbles[1]],
@@ -243,14 +255,14 @@ impl Chip8 {
 
                 // Registers dump
                 0x55 => {
-                    for i in 0..8 {
+                    for i in 0..=nibbles[1] {
                         self.memory[self.i as usize + i] = self.v[i];
                     }
                 },
 
                 // Registers load
                 0x65 => {
-                    for i in 0..8 {
+                    for i in 0..=nibbles[1] {
                         self.v[i] = self.memory[self.i as usize + i];
                     }
                 },
@@ -282,7 +294,7 @@ impl Chip8 {
 
             match self.display.fill(x, y + i, bytes) {
                 Ok(collison) => if collison { self.v[0xF] = 1 },
-                Err(HeightError) => break,
+                Err(HeightError) => (),
             }
         };
         self.display.update();

@@ -1,12 +1,31 @@
-use minifb::{Scale, Window, WindowOptions};
+use minifb::{Key, KeyRepeat, Scale, Window, WindowOptions};
 
 use super::utility::byte_to_bools;
 
 const WIDTH: usize = 64;
 const HEIGHT: usize = 32;
 
+const CHIP8_KEYS_AZERTY: [Key; 16] = [
+    Key::X, // 0
+    Key::Key1, // 1
+    Key::Key2, // 2
+    Key::Key3, // 3
+    Key::A, // 4
+    Key::Z, // 5
+    Key::E, // 6
+    Key::Q, // 7
+    Key::S, // 8
+    Key::D, // 9
+    Key::W, // 10 (A)
+    Key::C, // 11 (B)
+    Key::Key4, // 12 (C)
+    Key::R, // 13 (D)
+    Key::F, // 14 (E)
+    Key::V, // 15 (F)
+];
+
 pub struct Display {
-    window: minifb::Window,
+    pub window: minifb::Window,
     buffer: [bool; 64 * 32],
 }
 
@@ -59,9 +78,30 @@ impl Display {
         );
     }
 
-    pub fn get_keys(&self) {
-        
+    pub fn check_key(&mut self, key: u8) -> bool {
+        self.window.update();
+        self.window.is_key_down(CHIP8_KEYS_AZERTY[key as usize])
+    }
+
+    pub fn get_key(&self) -> Result<u8, NoKeysError> {
+        let keys = self.window.get_keys_pressed(KeyRepeat::Yes);
+        if keys.len() == 0 {
+            println!("No keys");
+            Err(NoKeysError)
+        } else {
+            println!("Keys : {keys:?}");
+            let pressed_key = keys[0];
+            for (code, key) in CHIP8_KEYS_AZERTY.iter().enumerate() {
+                println!("Checking key {key:?}");
+                if pressed_key == *key {
+                    return Ok(code as u8)
+                }
+            }
+            Err(NoKeysError)
+        }
     }
 }
 
 pub struct HeightError;
+
+pub struct NoKeysError;
