@@ -7,6 +7,6 @@ fn main() {
     chip8.load_cartridge("test-roms/3-corax+.ch8");
     loop {
         chip8.cycle();
-        thread::sleep(Duration::from_millis(500));
+        thread::sleep(Duration::from_millis(50));
     };
 }

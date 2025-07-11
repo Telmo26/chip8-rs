@@ -102,7 +102,7 @@ impl Chip8 {
                                                             // being in a subroutine, which indicates
                                                             // a bigger issue, and should crash.
 
-                _ => panic!("Opcode {opcode:#X} not yet implemented!"),
+                _ => panic!("Opcode {opcode:#X} not recognised!"),
             },
 
             // Jump
@@ -129,6 +129,72 @@ impl Chip8 {
             // Add to register
             0x7 => self.v[nibbles[1] as usize] = self.v[nibbles[1] as usize].wrapping_add(reconstruct_byte(&nibbles[2..]) as u8),
             
+            // Arithmetical operations : 8XYZ
+            0x8 => match nibbles[3] {
+                // Set VX = VY
+                0x0 => self.v[nibbles[1] as usize] = self.v[nibbles[2] as usize],
+
+                // VX = VX OR VY
+                0x1 => self.v[nibbles[1] as usize] = self.v[nibbles[1] as usize] | self.v[nibbles[2] as usize],
+
+                // VX = VX AND VY
+                0x2 => self.v[nibbles[1] as usize] = self.v[nibbles[1] as usize] & self.v[nibbles[2] as usize],
+
+                // VX = VX XOR VY
+                0x3 => self.v[nibbles[1] as usize] = self.v[nibbles[1] as usize] ^ self.v[nibbles[2] as usize],
+
+                // VX = VX + VY with carry
+                0x4 => {
+                    let overflow: bool;
+                    (self.v[nibbles[1] as usize], overflow) = self.v[nibbles[1] as usize].overflowing_add(self.v[nibbles[2] as usize]);
+                    if overflow {
+                        self.v[0xF] = 1;
+                    } else {
+                        self.v[0xF] = 0;
+                    }
+                },
+
+                // VX = VX - VY with carry
+                0x5 => {
+                    let underflow: bool;
+                    (self.v[nibbles[1] as usize], underflow) = self.v[nibbles[1] as usize].overflowing_sub(self.v[nibbles[2] as usize]);
+                    if underflow {
+                        self.v[0xF] = 0;
+                    } else {
+                        self.v[0xF] = 1;
+                    }
+                },
+
+                // VX = VY, VX >> 1, VF = bit shifted
+                0x6 => {
+                    self.v[nibbles[1] as usize] = self.v[nibbles[2] as usize] >> 1;
+                    self.v[0xF] = self.v[nibbles[2] as usize] % 2;
+                },
+
+                // VX = VY - VX with carry
+                0x7 => {
+                    let underflow: bool;
+                    (self.v[nibbles[1] as usize], underflow) = self.v[nibbles[2] as usize].overflowing_sub(self.v[nibbles[1] as usize]);
+                    if underflow {
+                        self.v[0xF] = 0;
+                    } else {
+                        self.v[0xF] = 1;
+                    }
+                },
+
+                // VX = VY, VX << 1, VF = bit shifted
+                0xE => {
+                    self.v[nibbles[1] as usize] = self.v[nibbles[2] as usize] << 1;
+                    if self.v[nibbles[1] as usize]/2 == self.v[nibbles[2] as usize] { // We use division by two to not overflow
+                        // We shifted away a zero
+                        self.v[0xF] = 0;
+                    } else {
+                        self.v[0xF] = 1;
+                    }
+                },
+                _ => panic!("Opcode {opcode:#X} not recognised!"),
+            }
+
             // 9XY0 -> if (VX != VY) skip one code block
             0x9 => if self.v[nibbles[1] as usize] != self.v[nibbles[2] as usize] { self.pc += 2 },
 
