@@ -261,14 +261,16 @@ impl Chip8 {
                 // Registers dump
                 0x55 => {
                     for i in 0..=nibbles[1] {
-                        self.memory[self.i as usize + i] = self.v[i];
+                        self.memory[self.i as usize] = self.v[i];
+                        self.i += 1;
                     }
                 },
 
                 // Registers load
                 0x65 => {
                     for i in 0..=nibbles[1] {
-                        self.v[i] = self.memory[self.i as usize + i];
+                        self.v[i] = self.memory[self.i as usize];
+                        self.i += 1;
                     }
                 },
 
