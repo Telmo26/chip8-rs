@@ -48,9 +48,9 @@ impl Display {
         self.buffer.fill(false);
     }
 
-    pub fn fill(&mut self, x: usize, y: usize, bytes: u8) -> Result<bool, HeightError> {
-        if !( y < HEIGHT ) {
-            return Err(HeightError)
+    pub fn fill(&mut self, x: usize, y: usize, bytes: u8) -> Result<bool, ClippingError> {
+        if y >= HEIGHT {
+            return Err(ClippingError)
         }
 
         let byte_array = byte_to_bools(bytes);
@@ -86,13 +86,10 @@ impl Display {
     pub fn get_key(&self) -> Result<u8, NoKeysError> {
         let keys = self.window.get_keys_pressed(KeyRepeat::Yes);
         if keys.len() == 0 {
-            println!("No keys");
             Err(NoKeysError)
         } else {
-            println!("Keys : {keys:?}");
             let pressed_key = keys[0];
             for (code, key) in CHIP8_KEYS_AZERTY.iter().enumerate() {
-                println!("Checking key {key:?}");
                 if pressed_key == *key {
                     return Ok(code as u8)
                 }
@@ -102,6 +99,6 @@ impl Display {
     }
 }
 
-pub struct HeightError;
+pub struct ClippingError;
 
 pub struct NoKeysError;

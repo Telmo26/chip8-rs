@@ -10,8 +10,6 @@ use display::Display;
 mod utility;
 use utility::reconstruct_byte;
 
-use crate::display::HeightError;
-
 pub struct Chip8 {
     pub memory: [u8; 4096],
     pc: u16,
@@ -139,13 +137,22 @@ impl Chip8 {
                 0x0 => self.v[nibbles[1]] = self.v[nibbles[2]],
 
                 // VX = VX OR VY
-                0x1 => self.v[nibbles[1]] = self.v[nibbles[1]] | self.v[nibbles[2]],
+                0x1 => {
+                    self.v[nibbles[1]] = self.v[nibbles[1]] | self.v[nibbles[2]];
+                    self.v[0xF] = 0;
+                } 
 
                 // VX = VX AND VY
-                0x2 => self.v[nibbles[1]] = self.v[nibbles[1]] & self.v[nibbles[2]],
+                0x2 => {
+                    self.v[nibbles[1]] = self.v[nibbles[1]] & self.v[nibbles[2]];
+                    self.v[0xF] = 0;
+                } 
 
                 // VX = VX XOR VY
-                0x3 => self.v[nibbles[1]] = self.v[nibbles[1]] ^ self.v[nibbles[2]],
+                0x3 => {
+                    self.v[nibbles[1]] = self.v[nibbles[1]] ^ self.v[nibbles[2]];
+                    self.v[0xF] = 0;
+                } 
 
                 // VX = VX + VY with carry
                 0x4 => {
@@ -221,12 +228,10 @@ impl Chip8 {
 
                 // VX = key pressed (blocking)
                 0x0A => {
-                    println!("Checking for keys");
                     let vx = &mut self.v[nibbles[1]];
                     match self.display.get_key() {
                         Ok(code) => {
                             *vx = code;
-                            println!("Key pressed : {code}");
                         },
                         Err(_) => self.pc -= 2,
                     }
@@ -286,7 +291,7 @@ impl Chip8 {
     }
 
     fn draw(&mut self, vx: usize, vy: usize, n: usize) {
-        let (x, y) = (self.v[vx] as usize, self.v[vy] as usize);
+        let (x, y) = ((self.v[vx] as usize) % 64, (self.v[vy] as usize) % 32);
         self.v[0xF] = 0;
 
         for i in 0..n {
@@ -294,7 +299,7 @@ impl Chip8 {
 
             match self.display.fill(x, y + i, bytes) {
                 Ok(collison) => if collison { self.v[0xF] = 1 },
-                Err(HeightError) => (),
+                Err(_) => (),
             }
         };
         self.display.update();
