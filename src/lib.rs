@@ -1,6 +1,5 @@
 use std::{
-    io::Read,
-    fs::File,
+    collections, fs::File, io::Read
 };
 
 mod display;
@@ -8,6 +7,8 @@ use display::Display;
 
 mod utility;
 use utility::reconstruct_byte;
+
+use crate::display::HeightError;
 
 pub struct Chip8 {
     pub memory: [u8; 4096],
@@ -123,10 +124,15 @@ impl Chip8 {
 
     fn draw(&mut self, vx: u16, vy: u16, n: u16) {
         let (x, y) = (self.v[vx as usize] as u16, self.v[vy as usize] as u16);
+        self.v[0xF] = 0;
 
         for i in 0..n {
             let bytes = self.memory[(self.i + i) as usize];
-            self.display.fill(x, y + i, bytes);
+
+            match self.display.fill(x, y + i, bytes) {
+                Ok(collison) => if collison { self.v[0xF] = 1 },
+                Err(HeightError) => break,
+            }
         };
         self.display.update();
     }

@@ -29,15 +29,24 @@ impl Display {
         self.buffer.fill(false);
     }
 
-    pub fn fill(&mut self, x: u16, y: u16, bytes: u8) {
+    pub fn fill(&mut self, x: u16, y: u16, bytes: u8) -> Result<bool, HeightError> {
+        if !( y < HEIGHT as u16 ) {
+            return Err(HeightError)
+        }
+
         let byte_array = byte_to_bools(bytes);
+        let mut collision =  false;
         
         for i in 0..8 {
-            let px = (x + i) % WIDTH as u16;
-            let py = y % HEIGHT as u16;
-            let idx = (py * WIDTH as u16 + px) as usize;
-            self.buffer[idx] = byte_array[i as usize];
-        }
+            let px = if x + i < WIDTH as u16 { x + i } else { (WIDTH - 1) as u16 } ;
+            let idx = (y * WIDTH as u16 + px) as usize;
+
+            if self.buffer[idx] && byte_array[i as usize] {
+                collision = true;
+            }
+            self.buffer[idx] = self.buffer[idx] ^ byte_array[i as usize];
+        };
+        Ok(collision)
     }
 
     pub fn update(&mut self) {
@@ -50,3 +59,5 @@ impl Display {
         );
     }
 }
+
+pub struct HeightError;
