@@ -3,11 +3,14 @@ use std::{
     fs::File,
 };
 
-use minifb::{Key, Window, WindowOptions};
+mod display;
+use display::Display;
+
+mod utility;
+use utility::reconstruct_byte;
 
 pub struct Chip8 {
     pub memory: [u8; 4096],
-    gfx: [bool; 64 * 32],
     pc: u16,
     i: u16,
     stack: [u16; 16],
@@ -15,21 +18,15 @@ pub struct Chip8 {
     delay_timer: u8,
     sound_timer: u8,
     v: [u8; 16],
-    window: Window,
+    display: Display,
 }
 
 impl Chip8 {
     pub fn new() -> Chip8 {
-        let mut window = Window::new("CHIP-8 - Rust Emulator",
-                                 64,
-                                 32,
-                                 WindowOptions::default()).unwrap();
-
-        window.set_target_fps(60);
+        let display = Display::new();
 
         let mut chip8 = Chip8 {
             memory: [0; 4096],
-            gfx: [false; 64 * 32],
             pc: 0x200,
             i: 0,
             stack: [0; 16],
@@ -37,7 +34,7 @@ impl Chip8 {
             delay_timer: 0,
             sound_timer: 0,
             v: [0; 16],
-            window,
+            display,
         };
         chip8.load_font();
         chip8
@@ -104,30 +101,36 @@ impl Chip8 {
         match nibbles[0] {
             0x0 => match nibbles[3] {
                 // Clear display
-                0x0 => self.clear_display(),
-                x => panic!("Opcode {opcode:#X} not yet implemented!"),
+                0x0 => self.display.clear(),
+                _ => panic!("Opcode {opcode:#X} not yet implemented!"),
             },
             // Jump
             0x1 => {
-                let address = nibbles[1] << 8 | nibbles[2] << 4 | nibbles[3];
+                let address = reconstruct_byte(nibbles[1], nibbles[2], nibbles[3]);
                 self.pc = address;
             },
             // Set register
             0x6 => self.v[nibbles[1] as usize] = (nibbles[2] << 4 | nibbles[3]) as u8, 
             // Add to register
             0x7 => self.v[nibbles[1] as usize] += (nibbles[2] << 4 | nibbles[3]) as u8,
-            0xA => self.i = nibbles[1] << 8 | nibbles[2] << 4 | nibbles[3],
+            // Set I register
+            0xA => self.i = reconstruct_byte(nibbles[1], nibbles[2], nibbles[3]),
+            // Draw call
             0xD => self.draw(nibbles[1], nibbles[2], nibbles[3]),
-            x => panic!("Opcode {opcode:#X} not yet implemented!"),
+            _ => panic!("Opcode {opcode:#X} not yet implemented!"),
         }
     }
 
-    fn clear_display(&mut self) {
-        self.gfx.fill(false);
+    fn draw(&mut self, vx: u16, vy: u16, n: u16) {
+        let (x, y) = (self.v[vx as usize] as u16, self.v[vy as usize] as u16);
+
+        for i in 0..n {
+            let bytes = self.memory[(self.i + i) as usize];
+            self.display.fill(x, y + i, bytes);
+        };
+        self.display.update();
     }
 
-    fn draw(&mut self, vx: u16, vy: u16, n: u16) {
-        println!("Draw call! n = {n}")
-    }
+
 
 }
