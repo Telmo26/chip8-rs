@@ -1,5 +1,10 @@
-pub fn reconstruct_byte(high: u16, mid: u16, low: u16) -> u16 {
-    high << 8 | mid << 4 | low
+pub fn reconstruct_byte(bytes: &[u16]) -> u16 {
+    let length = bytes.len();
+    let mut result: u16 = 0;
+    for i in 0..length {
+        result = result | (bytes[length - 1 - i] << (i * 4))
+    }
+    result
 }
 
 pub fn byte_to_bools(byte: u8) -> [bool; 8] {

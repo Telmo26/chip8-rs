@@ -1,5 +1,5 @@
 use std::{
-    collections, fs::File, io::Read
+    fs::File, io::Read
 };
 
 mod display;
@@ -14,8 +14,7 @@ pub struct Chip8 {
     pub memory: [u8; 4096],
     pc: u16,
     i: u16,
-    stack: [u16; 16],
-    sp: u8,
+    stack: Vec<u16>,
     delay_timer: u8,
     sound_timer: u8,
     v: [u8; 16],
@@ -30,8 +29,7 @@ impl Chip8 {
             memory: [0; 4096],
             pc: 0x200,
             i: 0,
-            stack: [0; 16],
-            sp: 0,
+            stack: Vec::with_capacity(16),
             delay_timer: 0,
             sound_timer: 0,
             v: [0; 16],
@@ -91,35 +89,68 @@ impl Chip8 {
     }
 
     fn execute_opcode(&mut self, opcode: u16) {
+        let nibbles = Self::divide_opcode(&opcode);
+        
+        match nibbles[0] {
+            0x0 => match nibbles[3] {
+                // Clear display
+                0x0 => self.display.clear(),
+
+                // Returning from a subroutine
+                0xE => self.pc = self.stack.pop().unwrap(), // If this crashes, it means we tried
+                                                            // to return from a subroutine without
+                                                            // being in a subroutine, which indicates
+                                                            // a bigger issue, and should crash.
+
+                _ => panic!("Opcode {opcode:#X} not yet implemented!"),
+            },
+
+            // Jump
+            0x1 => self.pc = reconstruct_byte(&nibbles[1..]),
+
+            // Subroutine calling
+            0x2 => {
+                self.stack.push(self.pc);
+                self.pc = reconstruct_byte(&nibbles[1..])
+            }
+
+            // 3XNN -> if (VX == NN) skip one code block
+            0x3 => if self.v[nibbles[1] as usize] == reconstruct_byte(&nibbles[2..]) as u8 { self.pc += 2 },
+
+            // 4XNN -> if (VX != NN) skip one code block
+            0x4 => if self.v[nibbles[1] as usize] != reconstruct_byte(&nibbles[2..]) as u8 { self.pc += 2 },
+
+            // 5XY0 -> if (VX == VY) skip one code block
+            0x5 => if self.v[nibbles[1] as usize] == self.v[nibbles[2] as usize] { self.pc += 2 },
+
+            // Set register
+            0x6 => self.v[nibbles[1] as usize] = reconstruct_byte(&nibbles[2..]) as u8, 
+
+            // Add to register
+            0x7 => self.v[nibbles[1] as usize] = self.v[nibbles[1] as usize].wrapping_add(reconstruct_byte(&nibbles[2..]) as u8),
+            
+            // 9XY0 -> if (VX != VY) skip one code block
+            0x9 => if self.v[nibbles[1] as usize] != self.v[nibbles[2] as usize] { self.pc += 2 },
+
+            // Set I register
+            0xA => self.i = reconstruct_byte(&nibbles[1..]),
+
+            // Draw call
+            0xD => self.draw(nibbles[1], nibbles[2], nibbles[3]),
+
+            _ => panic!("Opcode {opcode:#X} not yet implemented!"),
+        }
+    }
+
+    fn divide_opcode(opcode: &u16) -> [u16; 4] {
         // Here we divide the opcode into its 4 nibbles
-        let mut new_opcode = opcode;
+        let mut new_opcode = *opcode;
         let mut nibbles: [u16; 4] = [0 ; 4];
         for i in (0..nibbles.len()).rev() {
             nibbles[i] = new_opcode % 16;
             new_opcode = new_opcode >> 4;
         }
-
-        match nibbles[0] {
-            0x0 => match nibbles[3] {
-                // Clear display
-                0x0 => self.display.clear(),
-                _ => panic!("Opcode {opcode:#X} not yet implemented!"),
-            },
-            // Jump
-            0x1 => {
-                let address = reconstruct_byte(nibbles[1], nibbles[2], nibbles[3]);
-                self.pc = address;
-            },
-            // Set register
-            0x6 => self.v[nibbles[1] as usize] = (nibbles[2] << 4 | nibbles[3]) as u8, 
-            // Add to register
-            0x7 => self.v[nibbles[1] as usize] += (nibbles[2] << 4 | nibbles[3]) as u8,
-            // Set I register
-            0xA => self.i = reconstruct_byte(nibbles[1], nibbles[2], nibbles[3]),
-            // Draw call
-            0xD => self.draw(nibbles[1], nibbles[2], nibbles[3]),
-            _ => panic!("Opcode {opcode:#X} not yet implemented!"),
-        }
+        nibbles
     }
 
     fn draw(&mut self, vx: u16, vy: u16, n: u16) {
