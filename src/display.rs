@@ -58,6 +58,10 @@ impl Display {
             "Unable to update the display"
         );
     }
+
+    pub fn get_keys(&self) {
+        
+    }
 }
 
 pub struct HeightError;

@@ -1,6 +1,8 @@
 use std::{
-    fs::File, io::Read
+    fs::File, io::Read, 
 };
+
+use rand;
 
 mod display;
 use display::Display;
@@ -112,7 +114,7 @@ impl Chip8 {
             0x2 => {
                 self.stack.push(self.pc);
                 self.pc = reconstruct_byte(&nibbles[1..])
-            }
+            },
 
             // 3XNN -> if (VX == NN) skip one code block
             0x3 => if self.v[nibbles[1]] == reconstruct_byte(&nibbles[2..]) as u8 { self.pc += 2 },
@@ -201,8 +203,52 @@ impl Chip8 {
             // Set I register
             0xA => self.i = reconstruct_byte(&nibbles[1..]),
 
+            // Jump with offset
+            0xB => self.pc = (self.v[0x0] as u16).wrapping_add(reconstruct_byte(&nibbles[1..])),
+
+            // Random
+            0xC => {
+                let number: u8 = rand::random_range(..=u8::MAX);
+                self.v[nibbles[1]] = number & reconstruct_byte(&nibbles[2..]) as u8;
+            }
+
             // Draw call
             0xD => self.draw(nibbles[1], nibbles[2], nibbles[3]),
+
+            0xE => (),
+
+            0xF => match reconstruct_byte(&nibbles[2..]) {
+                0x07 => (),
+                0x0A => (),
+                0x15 => (),
+                0x18 => (),
+                0x1E => self.i = self.i.wrapping_add((self.v[nibbles[1]]) as u16),
+                0x29 => (),
+
+                // Binary-coded decimal conversion
+                0x33 => {
+                    let mut vx = self.v[nibbles[1]];
+                    for i in 0..3 {
+                        self.memory[self.i as usize + (2 - i)] = vx % 10;
+                        vx /= 10;
+                    }
+                },
+
+                // Registers dump
+                0x55 => {
+                    for i in 0..8 {
+                        self.memory[self.i as usize + i] = self.v[i];
+                    }
+                },
+
+                // Registers load
+                0x65 => {
+                    for i in 0..8 {
+                        self.v[i] = self.memory[self.i as usize + i];
+                    }
+                },
+                _ => panic!("Opcode {opcode:#X} not recognised!")
+            }
 
             _ => panic!("Opcode {opcode:#X} not yet implemented!"),
         }
@@ -224,7 +270,7 @@ impl Chip8 {
         self.v[0xF] = 0;
 
         for i in 0..n {
-            let bytes = self.memory[(self.i as usize + i)];
+            let bytes = self.memory[self.i as usize + i];
 
             match self.display.fill(x, y + i, bytes) {
                 Ok(collison) => if collison { self.v[0xF] = 1 },
@@ -233,7 +279,4 @@ impl Chip8 {
         };
         self.display.update();
     }
-
-
-
 }
