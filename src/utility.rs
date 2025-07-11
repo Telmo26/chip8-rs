@@ -1,8 +1,8 @@
-pub fn reconstruct_byte(bytes: &[u16]) -> u16 {
+pub fn reconstruct_byte(bytes: &[usize]) -> u16 {
     let length = bytes.len();
     let mut result: u16 = 0;
     for i in 0..length {
-        result = result | (bytes[length - 1 - i] << (i * 4))
+        result = result | (bytes[length - 1 - i] << (i * 4)) as u16
     }
     result
 }

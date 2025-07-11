@@ -115,38 +115,38 @@ impl Chip8 {
             }
 
             // 3XNN -> if (VX == NN) skip one code block
-            0x3 => if self.v[nibbles[1] as usize] == reconstruct_byte(&nibbles[2..]) as u8 { self.pc += 2 },
+            0x3 => if self.v[nibbles[1]] == reconstruct_byte(&nibbles[2..]) as u8 { self.pc += 2 },
 
             // 4XNN -> if (VX != NN) skip one code block
-            0x4 => if self.v[nibbles[1] as usize] != reconstruct_byte(&nibbles[2..]) as u8 { self.pc += 2 },
+            0x4 => if self.v[nibbles[1]] != reconstruct_byte(&nibbles[2..]) as u8 { self.pc += 2 },
 
             // 5XY0 -> if (VX == VY) skip one code block
-            0x5 => if self.v[nibbles[1] as usize] == self.v[nibbles[2] as usize] { self.pc += 2 },
+            0x5 => if self.v[nibbles[1]] == self.v[nibbles[2]] { self.pc += 2 },
 
             // Set register
-            0x6 => self.v[nibbles[1] as usize] = reconstruct_byte(&nibbles[2..]) as u8, 
+            0x6 => self.v[nibbles[1]] = reconstruct_byte(&nibbles[2..]) as u8, 
 
             // Add to register
-            0x7 => self.v[nibbles[1] as usize] = self.v[nibbles[1] as usize].wrapping_add(reconstruct_byte(&nibbles[2..]) as u8),
+            0x7 => self.v[nibbles[1]] = self.v[nibbles[1]].wrapping_add(reconstruct_byte(&nibbles[2..]) as u8),
             
             // Arithmetical operations : 8XYZ
             0x8 => match nibbles[3] {
                 // Set VX = VY
-                0x0 => self.v[nibbles[1] as usize] = self.v[nibbles[2] as usize],
+                0x0 => self.v[nibbles[1]] = self.v[nibbles[2]],
 
                 // VX = VX OR VY
-                0x1 => self.v[nibbles[1] as usize] = self.v[nibbles[1] as usize] | self.v[nibbles[2] as usize],
+                0x1 => self.v[nibbles[1]] = self.v[nibbles[1]] | self.v[nibbles[2]],
 
                 // VX = VX AND VY
-                0x2 => self.v[nibbles[1] as usize] = self.v[nibbles[1] as usize] & self.v[nibbles[2] as usize],
+                0x2 => self.v[nibbles[1]] = self.v[nibbles[1]] & self.v[nibbles[2]],
 
                 // VX = VX XOR VY
-                0x3 => self.v[nibbles[1] as usize] = self.v[nibbles[1] as usize] ^ self.v[nibbles[2] as usize],
+                0x3 => self.v[nibbles[1]] = self.v[nibbles[1]] ^ self.v[nibbles[2]],
 
                 // VX = VX + VY with carry
                 0x4 => {
                     let overflow: bool;
-                    (self.v[nibbles[1] as usize], overflow) = self.v[nibbles[1] as usize].overflowing_add(self.v[nibbles[2] as usize]);
+                    (self.v[nibbles[1]], overflow) = self.v[nibbles[1]].overflowing_add(self.v[nibbles[2]]);
                     if overflow {
                         self.v[0xF] = 1;
                     } else {
@@ -157,7 +157,7 @@ impl Chip8 {
                 // VX = VX - VY with carry
                 0x5 => {
                     let underflow: bool;
-                    (self.v[nibbles[1] as usize], underflow) = self.v[nibbles[1] as usize].overflowing_sub(self.v[nibbles[2] as usize]);
+                    (self.v[nibbles[1]], underflow) = self.v[nibbles[1]].overflowing_sub(self.v[nibbles[2]]);
                     if underflow {
                         self.v[0xF] = 0;
                     } else {
@@ -167,14 +167,14 @@ impl Chip8 {
 
                 // VX = VY, VX >> 1, VF = bit shifted
                 0x6 => {
-                    self.v[nibbles[1] as usize] = self.v[nibbles[2] as usize] >> 1;
-                    self.v[0xF] = self.v[nibbles[2] as usize] % 2;
+                    self.v[nibbles[1]] = self.v[nibbles[2]] >> 1;
+                    self.v[0xF] = self.v[nibbles[2]] % 2;
                 },
 
                 // VX = VY - VX with carry
                 0x7 => {
                     let underflow: bool;
-                    (self.v[nibbles[1] as usize], underflow) = self.v[nibbles[2] as usize].overflowing_sub(self.v[nibbles[1] as usize]);
+                    (self.v[nibbles[1]], underflow) = self.v[nibbles[2]].overflowing_sub(self.v[nibbles[1]]);
                     if underflow {
                         self.v[0xF] = 0;
                     } else {
@@ -184,8 +184,8 @@ impl Chip8 {
 
                 // VX = VY, VX << 1, VF = bit shifted
                 0xE => {
-                    self.v[nibbles[1] as usize] = self.v[nibbles[2] as usize] << 1;
-                    if self.v[nibbles[1] as usize]/2 == self.v[nibbles[2] as usize] { // We use division by two to not overflow
+                    self.v[nibbles[1]] = self.v[nibbles[2]] << 1;
+                    if self.v[nibbles[1]]/2 == self.v[nibbles[2]] { // We use division by two to not overflow
                         // We shifted away a zero
                         self.v[0xF] = 0;
                     } else {
@@ -196,7 +196,7 @@ impl Chip8 {
             }
 
             // 9XY0 -> if (VX != VY) skip one code block
-            0x9 => if self.v[nibbles[1] as usize] != self.v[nibbles[2] as usize] { self.pc += 2 },
+            0x9 => if self.v[nibbles[1]] != self.v[nibbles[2]] { self.pc += 2 },
 
             // Set I register
             0xA => self.i = reconstruct_byte(&nibbles[1..]),
@@ -208,23 +208,23 @@ impl Chip8 {
         }
     }
 
-    fn divide_opcode(opcode: &u16) -> [u16; 4] {
+    fn divide_opcode(opcode: &u16) -> [usize; 4] {
         // Here we divide the opcode into its 4 nibbles
         let mut new_opcode = *opcode;
-        let mut nibbles: [u16; 4] = [0 ; 4];
+        let mut nibbles: [usize; 4] = [0 ; 4];
         for i in (0..nibbles.len()).rev() {
-            nibbles[i] = new_opcode % 16;
+            nibbles[i] = (new_opcode % 16) as usize;
             new_opcode = new_opcode >> 4;
         }
         nibbles
     }
 
-    fn draw(&mut self, vx: u16, vy: u16, n: u16) {
-        let (x, y) = (self.v[vx as usize] as u16, self.v[vy as usize] as u16);
+    fn draw(&mut self, vx: usize, vy: usize, n: usize) {
+        let (x, y) = (self.v[vx] as usize, self.v[vy] as usize);
         self.v[0xF] = 0;
 
         for i in 0..n {
-            let bytes = self.memory[(self.i + i) as usize];
+            let bytes = self.memory[(self.i as usize + i)];
 
             match self.display.fill(x, y + i, bytes) {
                 Ok(collison) => if collison { self.v[0xF] = 1 },

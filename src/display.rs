@@ -29,8 +29,8 @@ impl Display {
         self.buffer.fill(false);
     }
 
-    pub fn fill(&mut self, x: u16, y: u16, bytes: u8) -> Result<bool, HeightError> {
-        if !( y < HEIGHT as u16 ) {
+    pub fn fill(&mut self, x: usize, y: usize, bytes: u8) -> Result<bool, HeightError> {
+        if !( y < HEIGHT ) {
             return Err(HeightError)
         }
 
@@ -38,8 +38,8 @@ impl Display {
         let mut collision =  false;
         
         for i in 0..8 {
-            let px = if x + i < WIDTH as u16 { x + i } else { (WIDTH - 1) as u16 } ;
-            let idx = (y * WIDTH as u16 + px) as usize;
+            let px = if x + i < WIDTH { x + i } else { WIDTH - 1 } ;
+            let idx = (y * WIDTH + px) as usize;
 
             if self.buffer[idx] && byte_array[i as usize] {
                 collision = true;
